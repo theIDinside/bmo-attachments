@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download all attachments of a Bugzilla bug into a directory named after the bug.
+"""Download all attachments of one or more Bugzilla bugs, each into a directory named after the bug.
 
 If the bug is a meta bug (has the "meta" keyword), the bugs it depends on are
 downloaded too, each into its own subdirectory of the meta bug's directory.
@@ -106,7 +106,7 @@ def download(bug_id, parent, args, key, seen):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("bug", type=int)
+    parser.add_argument("bugs", type=int, nargs="+", metavar="bug")
     parser.add_argument("-o", "--outdir", default=".", help="parent directory")
     parser.add_argument(
         "--include-obsolete",
@@ -120,10 +120,18 @@ def main():
     )
     args = parser.parse_args()
 
-    try:
-        download(args.bug, Path(args.outdir), args, api_key(), set())
-    except BugzillaError as e:
-        sys.exit(str(e))
+    key = api_key()
+    failed = []
+    for i, bug_id in enumerate(args.bugs):
+        if i:
+            print()
+        try:
+            download(bug_id, Path(args.outdir), args, key, set())
+        except BugzillaError as e:
+            print(f"Bug {bug_id}: {e}", file=sys.stderr)
+            failed.append(bug_id)
+    if failed:
+        sys.exit(f"Failed: {' '.join(map(str, failed))}")
 
 
 if __name__ == "__main__":

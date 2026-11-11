@@ -1,6 +1,6 @@
 # bmo-attachments
 
-Download every attachment on a bugzilla.mozilla.org bug into a folder named after the bug number.
+Download every attachment on one or more bugzilla.mozilla.org bugs, each into a folder named after the bug number.
 
 It uses the Bugzilla REST API with your personal API key, so it works on security bugs and other restricted bugs, as long as your account can already see them. It cannot see anything your account can't.
 
@@ -45,6 +45,7 @@ To revoke a key, go back to the **API Keys** tab, tick **Revoked** next to it, a
 ```sh
 bmo-attachments 1234567                      # creates ./1234567/
 bmo-attachments 1234567 -o ~/bugs            # creates ~/bugs/1234567/
+bmo-attachments 1234567 7654321 1111111      # creates ./1234567/, ./7654321/ and ./1111111/
 bmo-attachments 1234567 --include-obsolete   # also fetch obsolete attachments
 bmo-attachments 1234567 --include-phabricator  # also fetch Phabricator revision links
 ```
@@ -78,4 +79,5 @@ Each bug is downloaded only once, even if several meta bugs depend on it. If a d
 ## Notes
 
 - Re-running the command overwrites files that are already in the folder.
-- If the bug doesn't exist, you can't see it, or your key is invalid, the script stops and prints the error message from Bugzilla.
+- When you pass several bugs, each one gets its own top-level folder, even if one of them is also a dependency of a meta bug you listed (it is then downloaded in both places).
+- If a bug doesn't exist, you can't see it, or your key is invalid, the script prints the error message from Bugzilla and moves on to the next bug. At the end it lists the bugs that failed and exits with an error status.
