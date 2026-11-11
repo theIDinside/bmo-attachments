@@ -53,7 +53,7 @@ bmo-attachments 1234567 --include-phabricator  # also fetch Phabricator revision
 The bug folder will contain:
 
 - `summary.md`: the bug title, its URL, and the bug description (first comment).
-- One file per attachment, named `<attachment-id>-<filename>`. The ID prefix stops two attachments with the same name (say, two `testcase.html`) from overwriting each other, and matches `attachment.cgi?id=<attachment-id>` on Bugzilla.
+- One file per attachment, under its original filename. If two attachments share a name (say, two `testcase.html`), the later one gets its attachment ID as a prefix (`<attachment-id>-<filename>`) so it does not overwrite the first.
 
 Obsolete attachments are skipped unless you pass `--include-obsolete`.
 

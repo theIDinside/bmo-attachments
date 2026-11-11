@@ -87,11 +87,17 @@ def download(bug_id, parent, args, key, seen):
     if not attachments:
         print("No attachments to download")
 
+    used = {"summary.md"}
     for att in attachments:
         att_id = att["id"]
         data = get(f"bug/attachment/{att_id}?include_fields=data", key)
         content = base64.b64decode(data["attachments"][str(att_id)]["data"])
-        path = dest / f"{att_id}-{safe_name(att['file_name'])}"
+        name = safe_name(att["file_name"])
+        # Only prefix the attachment ID when another attachment already took the name.
+        if name in used:
+            name = f"{att_id}-{name}"
+        used.add(name)
+        path = dest / name
         path.write_bytes(content)
         flags = " (obsolete)" if att["is_obsolete"] else ""
         print(f"{path}  [{len(content)} bytes]{flags}  {att['summary']}")
