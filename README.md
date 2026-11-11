@@ -10,11 +10,11 @@ Python 3. Nothing else needs installing; it only uses the standard library.
 
 ## Setup
 
-1. Create an API key at <https://bugzilla.mozilla.org/userprefs.cgi?tab=apikey>. Type a description (e.g. `bmo-attachments`) and click **Submit Changes**. The key is only shown once, so copy it right away.
-2. Store the key where only you can read it:
+1. Create a Bugzilla API key (see [Creating a Bugzilla API key](#creating-a-bugzilla-api-key)).
+2. Save the key to `~/.config/bmo-api-key`, which is where the script looks for it. Run the `cat` command below, paste the key, press Enter, then press Ctrl-D. Then run `chmod` so that only you can read the file:
 
    ```sh
-   echo 'YOUR_API_KEY' > ~/.config/bmo-api-key
+   cat > ~/.config/bmo-api-key
    chmod 600 ~/.config/bmo-api-key
    ```
 
@@ -26,7 +26,19 @@ Python 3. Nothing else needs installing; it only uses the standard library.
    cp bmo-attachments ~/.local/bin/
    ```
 
-The key gives full access to your Bugzilla account, including any security bugs you can see. Don't commit it or share it. If it leaks, revoke it on the same preferences page.
+The key gives full access to your Bugzilla account, including any security bugs you can see. Don't commit it or share it. If it leaks, revoke it (see [Creating a Bugzilla API key](#creating-a-bugzilla-api-key)).
+
+## Creating a Bugzilla API key
+
+An API key lets a script act as your account without your password. Bugzilla only returns what your account can already see.
+
+1. Log in to <https://bugzilla.mozilla.org>.
+2. Open the API key preferences: click your name or avatar in the top-right corner, choose **Preferences**, then open the **API Keys** tab. You can also go straight to <https://bugzilla.mozilla.org/userprefs.cgi?tab=apikey>.
+3. In the section for creating a new key, tick the checkbox to generate a new API key (if there is one), and enter a description such as `bmo-attachments`. The description is only there to help you recognize the key later.
+4. Click **Submit Changes**.
+5. The new key appears on the page as a long string of letters and digits. Copy it now and store it as described in [Setup](#setup). It may not be shown in full again; if you lose it, just create a new one.
+
+To revoke a key, go back to the **API Keys** tab, tick **Revoked** next to it, and click **Submit Changes**. Scripts using that key stop working immediately.
 
 ## Usage
 
