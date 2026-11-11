@@ -52,7 +52,7 @@ bmo-attachments 1234567 --include-phabricator  # also fetch Phabricator revision
 
 The bug folder will contain:
 
-- `summary.txt`: the bug title and its URL.
+- `summary.md`: the bug title, its URL, and the bug description (first comment).
 - One file per attachment, named `<attachment-id>-<filename>`. The ID prefix stops two attachments with the same name (say, two `testcase.html`) from overwriting each other, and matches `attachment.cgi?id=<attachment-id>` on Bugzilla.
 
 Obsolete attachments are skipped unless you pass `--include-obsolete`.
@@ -65,13 +65,13 @@ If the bug has the `meta` keyword, the script also downloads every bug it depend
 
 ```
 1234567/                 # the meta bug
-├── summary.txt
+├── summary.md
 ├── 1111111/             # a bug it depends on
-│   └── summary.txt
+│   └── summary.md
 └── 2222222/             # another meta bug it depends on
-    ├── summary.txt
+    ├── summary.md
     └── 3333333/
-        └── summary.txt
+        └── summary.md
 ```
 
 Each bug is downloaded only once, even if several meta bugs depend on it. If a depended-on bug can't be fetched (for example, you don't have access to it), the script prints a warning and carries on with the rest.

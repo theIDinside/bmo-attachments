@@ -66,9 +66,13 @@ def download(bug_id, parent, args, key, seen):
     )["bugs"][0]
     dest = parent / str(bug_id)
     dest.mkdir(parents=True, exist_ok=True)
-    (dest / "summary.txt").write_text(
+    comments = get(f"bug/{bug_id}/comment?include_fields=text", key)
+    comments = comments["bugs"][str(bug_id)]["comments"]
+    description = comments[0]["text"] if comments else ""
+    (dest / "summary.md").write_text(
         f"Bug {bug_id} - {bug['summary']}\n"
         f"https://bugzilla.mozilla.org/show_bug.cgi?id={bug_id}\n"
+        f"\n{description}\n"
     )
     print(f"Bug {bug_id} - {bug['summary']}")
 
