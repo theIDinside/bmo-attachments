@@ -17,6 +17,7 @@ from pathlib import Path
 
 BMO = "https://bugzilla.mozilla.org/rest"
 KEY_FILE = Path.home() / ".config" / "bmo-api-key"
+PHABRICATOR_CONTENT_TYPE = "text/x-phabricator-request"
 
 
 def api_key():
@@ -59,6 +60,11 @@ def main():
         action="store_true",
         help="also download obsolete attachments",
     )
+    parser.add_argument(
+        "--include-phabricator",
+        action="store_true",
+        help="also download Phabricator revision links",
+    )
     args = parser.parse_args()
 
     key = api_key()
@@ -75,6 +81,10 @@ def main():
     attachments = listing["bugs"].get(str(args.bug), [])
     if not args.include_obsolete:
         attachments = [a for a in attachments if not a["is_obsolete"]]
+    if not args.include_phabricator:
+        attachments = [
+            a for a in attachments if a["content_type"] != PHABRICATOR_CONTENT_TYPE
+        ]
     if not attachments:
         print("No attachments to download")
         return

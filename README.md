@@ -34,6 +34,7 @@ The key gives full access to your Bugzilla account, including any security bugs 
 bmo-attachments 1234567                      # creates ./1234567/
 bmo-attachments 1234567 -o ~/bugs            # creates ~/bugs/1234567/
 bmo-attachments 1234567 --include-obsolete   # also fetch obsolete attachments
+bmo-attachments 1234567 --include-phabricator  # also fetch Phabricator revision links
 ```
 
 The bug folder will contain:
@@ -43,7 +44,7 @@ The bug folder will contain:
 
 Obsolete attachments are skipped unless you pass `--include-obsolete`.
 
-Phabricator patches show up as small `phabricator-D<nnn>-url.txt` files. Each one just contains the revision URL.
+Phabricator patches are skipped unless you pass `--include-phabricator`. With it, each one is saved as a small `phabricator-D<nnn>-url.txt` file that just contains the revision URL.
 
 ## Notes
 
