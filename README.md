@@ -58,6 +58,23 @@ Obsolete attachments are skipped unless you pass `--include-obsolete`.
 
 Phabricator patches are skipped unless you pass `--include-phabricator`. With it, each one is saved as a small `phabricator-D<nnn>-url.txt` file that just contains the revision URL.
 
+### Meta bugs
+
+If the bug has the `meta` keyword, the script also downloads every bug it depends on (the "Depends on" field), each into its own folder inside the meta bug's folder. Depended-on bugs that are themselves meta bugs are followed the same way, so the folders nest:
+
+```
+1234567/                 # the meta bug
+├── summary.txt
+├── 1111111/             # a bug it depends on
+│   └── summary.txt
+└── 2222222/             # another meta bug it depends on
+    ├── summary.txt
+    └── 3333333/
+        └── summary.txt
+```
+
+Each bug is downloaded only once, even if several meta bugs depend on it. If a depended-on bug can't be fetched (for example, you don't have access to it), the script prints a warning and carries on with the rest.
+
 ## Notes
 
 - Re-running the command overwrites files that are already in the folder.

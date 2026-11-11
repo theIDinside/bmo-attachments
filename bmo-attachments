@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Download all attachments of a Bugzilla bug into a directory named after the bug.
 
+If the bug is a meta bug (has the "meta" keyword), the bugs it depends on are
+downloaded too, each into its own subdirectory of the meta bug's directory.
+
 API key: $BUGZILLA_API_KEY, or the contents of ~/.config/bmo-api-key.
 Create one at https://bugzilla.mozilla.org/userprefs.cgi?tab=apikey
 """
@@ -18,6 +21,10 @@ from pathlib import Path
 BMO = "https://bugzilla.mozilla.org/rest"
 KEY_FILE = Path.home() / ".config" / "bmo-api-key"
 PHABRICATOR_CONTENT_TYPE = "text/x-phabricator-request"
+
+
+class BugzillaError(Exception):
+    pass
 
 
 def api_key():
@@ -43,12 +50,58 @@ def get(path, key):
             body = json.loads(body).get("message", body)
         except ValueError:
             pass
-        sys.exit(f"HTTP {e.code} for {path}: {body}")
+        raise BugzillaError(f"HTTP {e.code} for {path}: {body}")
 
 
 def safe_name(name):
     name = re.sub(r"[/\\\x00]", "_", name).strip(". ")
     return name or "attachment"
+
+
+def download(bug_id, parent, args, key, seen):
+    """Download bug_id into parent/<bug_id>/, recursing into dependencies of meta bugs."""
+    seen.add(bug_id)
+    bug = get(
+        f"bug/{bug_id}?include_fields=summary,keywords,depends_on", key
+    )["bugs"][0]
+    dest = parent / str(bug_id)
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "summary.txt").write_text(
+        f"Bug {bug_id} - {bug['summary']}\n"
+        f"https://bugzilla.mozilla.org/show_bug.cgi?id={bug_id}\n"
+    )
+    print(f"Bug {bug_id} - {bug['summary']}")
+
+    listing = get(f"bug/{bug_id}/attachment?exclude_fields=data", key)
+    attachments = listing["bugs"].get(str(bug_id), [])
+    if not args.include_obsolete:
+        attachments = [a for a in attachments if not a["is_obsolete"]]
+    if not args.include_phabricator:
+        attachments = [
+            a for a in attachments if a["content_type"] != PHABRICATOR_CONTENT_TYPE
+        ]
+    if not attachments:
+        print("No attachments to download")
+
+    for att in attachments:
+        att_id = att["id"]
+        data = get(f"bug/attachment/{att_id}?include_fields=data", key)
+        content = base64.b64decode(data["attachments"][str(att_id)]["data"])
+        path = dest / f"{att_id}-{safe_name(att['file_name'])}"
+        path.write_bytes(content)
+        flags = " (obsolete)" if att["is_obsolete"] else ""
+        print(f"{path}  [{len(content)} bytes]{flags}  {att['summary']}")
+
+    if "meta" not in bug["keywords"]:
+        return
+    for dep in bug["depends_on"]:
+        if dep in seen:
+            continue
+        print()
+        try:
+            download(dep, dest, args, key, seen)
+        except BugzillaError as e:
+            print(f"Skipping bug {dep}: {e}", file=sys.stderr)
 
 
 def main():
@@ -67,36 +120,10 @@ def main():
     )
     args = parser.parse_args()
 
-    key = api_key()
-    bug = get(f"bug/{args.bug}?include_fields=summary", key)["bugs"][0]
-    dest = Path(args.outdir) / str(args.bug)
-    dest.mkdir(parents=True, exist_ok=True)
-    (dest / "summary.txt").write_text(
-        f"Bug {args.bug} - {bug['summary']}\n"
-        f"https://bugzilla.mozilla.org/show_bug.cgi?id={args.bug}\n"
-    )
-    print(f"Bug {args.bug} - {bug['summary']}")
-
-    listing = get(f"bug/{args.bug}/attachment?exclude_fields=data", key)
-    attachments = listing["bugs"].get(str(args.bug), [])
-    if not args.include_obsolete:
-        attachments = [a for a in attachments if not a["is_obsolete"]]
-    if not args.include_phabricator:
-        attachments = [
-            a for a in attachments if a["content_type"] != PHABRICATOR_CONTENT_TYPE
-        ]
-    if not attachments:
-        print("No attachments to download")
-        return
-
-    for att in attachments:
-        att_id = att["id"]
-        data = get(f"bug/attachment/{att_id}?include_fields=data", key)
-        content = base64.b64decode(data["attachments"][str(att_id)]["data"])
-        path = dest / f"{att_id}-{safe_name(att['file_name'])}"
-        path.write_bytes(content)
-        flags = " (obsolete)" if att["is_obsolete"] else ""
-        print(f"{path}  [{len(content)} bytes]{flags}  {att['summary']}")
+    try:
+        download(args.bug, Path(args.outdir), args, api_key(), set())
+    except BugzillaError as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":
