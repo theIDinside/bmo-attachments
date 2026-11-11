@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Download all attachments of a Bugzilla bug into a directory named after the bug.
+
+API key: $BUGZILLA_API_KEY, or the contents of ~/.config/bmo-api-key.
+Create one at https://bugzilla.mozilla.org/userprefs.cgi?tab=apikey
+"""
+
+import argparse
+import base64
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+BMO = "https://bugzilla.mozilla.org/rest"
+KEY_FILE = Path.home() / ".config" / "bmo-api-key"
+
+
+def api_key():
+    key = os.environ.get("BUGZILLA_API_KEY")
+    if not key and KEY_FILE.exists():
+        key = KEY_FILE.read_text().strip()
+    if not key:
+        sys.exit(f"No API key: set BUGZILLA_API_KEY or write it to {KEY_FILE}")
+    return key
+
+
+def get(path, key):
+    req = urllib.request.Request(
+        f"{BMO}/{path}",
+        headers={"X-BUGZILLA-API-KEY": key, "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.load(resp)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        try:
+            body = json.loads(body).get("message", body)
+        except ValueError:
+            pass
+        sys.exit(f"HTTP {e.code} for {path}: {body}")
+
+
+def safe_name(name):
+    name = re.sub(r"[/\\\x00]", "_", name).strip(". ")
+    return name or "attachment"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("bug", type=int)
+    parser.add_argument("-o", "--outdir", default=".", help="parent directory")
+    parser.add_argument(
+        "--include-obsolete",
+        action="store_true",
+        help="also download obsolete attachments",
+    )
+    args = parser.parse_args()
+
+    key = api_key()
+    bug = get(f"bug/{args.bug}?include_fields=summary", key)["bugs"][0]
+    dest = Path(args.outdir) / str(args.bug)
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "summary.txt").write_text(
+        f"Bug {args.bug} - {bug['summary']}\n"
+        f"https://bugzilla.mozilla.org/show_bug.cgi?id={args.bug}\n"
+    )
+    print(f"Bug {args.bug} - {bug['summary']}")
+
+    listing = get(f"bug/{args.bug}/attachment?exclude_fields=data", key)
+    attachments = listing["bugs"].get(str(args.bug), [])
+    if not args.include_obsolete:
+        attachments = [a for a in attachments if not a["is_obsolete"]]
+    if not attachments:
+        print("No attachments to download")
+        return
+
+    for att in attachments:
+        att_id = att["id"]
+        data = get(f"bug/attachment/{att_id}?include_fields=data", key)
+        content = base64.b64decode(data["attachments"][str(att_id)]["data"])
+        path = dest / f"{att_id}-{safe_name(att['file_name'])}"
+        path.write_bytes(content)
+        flags = " (obsolete)" if att["is_obsolete"] else ""
+        print(f"{path}  [{len(content)} bytes]{flags}  {att['summary']}")
+
+
+if __name__ == "__main__":
+    main()
