@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download all attachments of one or more Bugzilla bugs, each into a directory named after the bug.
+"""Download attachments of Bugzilla bugs into a directory per bug.
 
 With --list-ni, list the bugs with a needinfo request for you instead.
 
@@ -69,14 +69,30 @@ def download(bug_id, parent, args, key, seen):
     )["bugs"][0]
     dest = parent / str(bug_id)
     dest.mkdir(parents=True, exist_ok=True)
-    comments = get(f"bug/{bug_id}/comment?include_fields=text", key)
+    comments = get(
+        f"bug/{bug_id}/comment?include_fields=count,creator,creation_time,text", key
+    )
     comments = comments["bugs"][str(bug_id)]["comments"]
+    comments = sorted(comments, key=lambda comment: comment["count"])
     description = comments[0]["text"] if comments else ""
     (dest / "summary.md").write_text(
         f"Bug {bug_id} - {bug['summary']}\n"
         f"https://bugzilla.mozilla.org/show_bug.cgi?id={bug_id}\n"
         f"\n{description}\n"
     )
+    if args.include_comments:
+        (dest / "comments.md").write_text(
+            f"# Bug {bug_id} - {bug['summary']}\n\n"
+            + "\n\n---\n\n".join(
+                f"## Comment {comment['count']}\n\n"
+                f"{comment['creator']} — {comment['creation_time']}\n\n"
+                f"https://bugzilla.mozilla.org/show_bug.cgi?id={bug_id}#c{comment['count']}\n\n"
+                f"{comment['text']}"
+                for comment in comments
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     print(f"Bug {bug_id} - {bug['summary']}")
 
     listing = get(f"bug/{bug_id}/attachment?exclude_fields=data", key)
@@ -90,7 +106,7 @@ def download(bug_id, parent, args, key, seen):
     if not attachments:
         print("No attachments to download")
 
-    used = {"summary.md"}
+    used = {"summary.md", "comments.md"}
     for att in attachments:
         att_id = att["id"]
         data = get(f"bug/attachment/{att_id}?include_fields=data", key)
@@ -154,6 +170,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("bugs", type=int, nargs="*", metavar="bug")
     parser.add_argument("-o", "--outdir", default=".", help="parent directory")
+    parser.add_argument(
+        "--include-comments",
+        action="store_true",
+        help="also save all bug comments to comments.md",
+    )
     parser.add_argument(
         "--include-obsolete",
         action="store_true",

@@ -1,6 +1,6 @@
 # bmo
 
-Download every attachment on one or more bugzilla.mozilla.org bugs, each into a folder named after the bug number. It can also list the bugs where someone has asked you for information (needinfo).
+Download attachments on one or more bugzilla.mozilla.org bugs, each into a folder named after the bug number. It can also list the bugs where someone has asked you for information (needinfo).
 
 It uses the Bugzilla REST API with your personal API key, so it works on security bugs and other restricted bugs, as long as your account can already see them. It cannot see anything your account can't.
 
@@ -46,6 +46,7 @@ To revoke a key, go back to the **API Keys** tab, tick **Revoked** next to it, a
 bmo 1234567                      # creates ./1234567/
 bmo 1234567 -o ~/bugs            # creates ~/bugs/1234567/
 bmo 1234567 7654321 1111111      # creates ./1234567/, ./7654321/ and ./1111111/
+bmo 1234567 --include-comments   # also save all bug comments
 bmo 1234567 --include-obsolete   # also fetch obsolete attachments
 bmo 1234567 --include-phabricator  # also fetch Phabricator revision links
 ```
@@ -53,7 +54,10 @@ bmo 1234567 --include-phabricator  # also fetch Phabricator revision links
 The bug folder will contain:
 
 - `summary.md`: the bug title, its URL, and the bug description (first comment).
+- `comments.md` (with `--include-comments`): all comments visible to your account, including the description, in comment-number order. Each includes its original comment number, author, timestamp, and a direct link.
 - One file per attachment, under its original filename. If two attachments share a name (say, two `testcase.html`), the later one gets its attachment ID as a prefix (`<attachment-id>-<filename>`) so it does not overwrite the first.
+
+Comments are saved to `comments.md` only with `--include-comments`, including for dependencies of meta bugs. The description is always included in `summary.md`.
 
 Obsolete attachments are skipped unless you pass `--include-obsolete`.
 
