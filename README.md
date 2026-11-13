@@ -1,4 +1,4 @@
-# bmo-attachments
+# bmo
 
 Download every attachment on one or more bugzilla.mozilla.org bugs, each into a folder named after the bug number.
 
@@ -23,7 +23,7 @@ Python 3. Nothing else needs installing; it only uses the standard library.
 3. Put the script somewhere on your `PATH`:
 
    ```sh
-   cp bmo-attachments ~/.local/bin/
+   cp bmo ~/.local/bin/
    ```
 
 The key gives full access to your Bugzilla account, including any security bugs you can see. Don't commit it or share it. If it leaks, revoke it (see [Creating a Bugzilla API key](#creating-a-bugzilla-api-key)).
@@ -34,7 +34,7 @@ An API key lets a script act as your account without your password. Bugzilla onl
 
 1. Log in to <https://bugzilla.mozilla.org>.
 2. Open the API key preferences: click your name or avatar in the top-right corner, choose **Preferences**, then open the **API Keys** tab. You can also go straight to <https://bugzilla.mozilla.org/userprefs.cgi?tab=apikey>.
-3. In the section for creating a new key, tick the checkbox to generate a new API key (if there is one), and enter a description such as `bmo-attachments`. The description is only there to help you recognize the key later.
+3. In the section for creating a new key, tick the checkbox to generate a new API key (if there is one), and enter a description such as `bmo`. The description is only there to help you recognize the key later.
 4. Click **Submit Changes**.
 5. The new key appears on the page as a long string of letters and digits. Copy it now and store it as described in [Setup](#setup). It may not be shown in full again; if you lose it, just create a new one.
 
@@ -43,11 +43,11 @@ To revoke a key, go back to the **API Keys** tab, tick **Revoked** next to it, a
 ## Usage
 
 ```sh
-bmo-attachments 1234567                      # creates ./1234567/
-bmo-attachments 1234567 -o ~/bugs            # creates ~/bugs/1234567/
-bmo-attachments 1234567 7654321 1111111      # creates ./1234567/, ./7654321/ and ./1111111/
-bmo-attachments 1234567 --include-obsolete   # also fetch obsolete attachments
-bmo-attachments 1234567 --include-phabricator  # also fetch Phabricator revision links
+bmo 1234567                      # creates ./1234567/
+bmo 1234567 -o ~/bugs            # creates ~/bugs/1234567/
+bmo 1234567 7654321 1111111      # creates ./1234567/, ./7654321/ and ./1111111/
+bmo 1234567 --include-obsolete   # also fetch obsolete attachments
+bmo 1234567 --include-phabricator  # also fetch Phabricator revision links
 ```
 
 The bug folder will contain:
