@@ -1,6 +1,6 @@
 # bmo
 
-Download every attachment on one or more bugzilla.mozilla.org bugs, each into a folder named after the bug number.
+Download every attachment on one or more bugzilla.mozilla.org bugs, each into a folder named after the bug number. It can also list the bugs where someone has asked you for information (needinfo).
 
 It uses the Bugzilla REST API with your personal API key, so it works on security bugs and other restricted bugs, as long as your account can already see them. It cannot see anything your account can't.
 
@@ -75,6 +75,22 @@ If the bug has the `meta` keyword, the script also downloads every bug it depend
 ```
 
 Each bug is downloaded only once, even if several meta bugs depend on it. If a depended-on bug can't be fetched (for example, you don't have access to it), the script prints a warning and carries on with the rest.
+
+### Listing your needinfos
+
+```sh
+bmo --list-ni
+```
+
+This lists every bug with an open needinfo request for you, oldest request first, and does not download anything. "You" is the account the API key belongs to. Each entry shows the bug number and title, who asked and on what date, and a link to the bug:
+
+```
+Bug 1234567 - Crash when opening the settings page
+  from someone@mozilla.com on 2026-10-01
+  https://bugzilla.mozilla.org/show_bug.cgi?id=1234567
+```
+
+If you have several needinfo requests on the same bug, it is listed once per request. `--list-ni` can't be combined with bug numbers.
 
 ## Notes
 

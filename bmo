@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Download all attachments of one or more Bugzilla bugs, each into a directory named after the bug.
 
+With --list-ni, list the bugs with a needinfo request for you instead.
+
 If the bug is a meta bug (has the "meta" keyword), the bugs it depends on are
 downloaded too, each into its own subdirectory of the meta bug's directory.
 
@@ -15,6 +17,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -114,9 +117,42 @@ def download(bug_id, parent, args, key, seen):
             print(f"Skipping bug {dep}: {e}", file=sys.stderr)
 
 
+def list_needinfos(key):
+    """Print the bugs with an open needinfo request for the API key's user, oldest first."""
+    me = get("whoami", key)["name"]
+    query = urllib.parse.urlencode(
+        {
+            "f1": "requestees.login_name",
+            "o1": "equals",
+            "v1": me,
+            "f2": "flagtypes.name",
+            "o2": "equals",
+            "v2": "needinfo?",
+            "include_fields": "id,summary,flags",
+        }
+    )
+    requests = []
+    for bug in get(f"bug?{query}", key)["bugs"]:
+        # The search can match a needinfo for someone else plus another flag for us.
+        for flag in bug["flags"]:
+            if (
+                flag["name"] == "needinfo"
+                and flag["status"] == "?"
+                and flag.get("requestee") == me
+            ):
+                requests.append((flag["creation_date"], flag["setter"], bug))
+    if not requests:
+        print("No needinfo requests")
+        return
+    for date, setter, bug in sorted(requests, key=lambda r: r[0]):
+        print(f"Bug {bug['id']} - {bug['summary']}")
+        print(f"  from {setter} on {date[:10]}")
+        print(f"  https://bugzilla.mozilla.org/show_bug.cgi?id={bug['id']}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("bugs", type=int, nargs="+", metavar="bug")
+    parser.add_argument("bugs", type=int, nargs="*", metavar="bug")
     parser.add_argument("-o", "--outdir", default=".", help="parent directory")
     parser.add_argument(
         "--include-obsolete",
@@ -128,9 +164,24 @@ def main():
         action="store_true",
         help="also download Phabricator revision links",
     )
+    parser.add_argument(
+        "--list-ni",
+        action="store_true",
+        help="list bugs with a needinfo request for you, instead of downloading",
+    )
     args = parser.parse_args()
+    if args.list_ni and args.bugs:
+        parser.error("--list-ni does not take bug numbers")
+    if not args.list_ni and not args.bugs:
+        parser.error("give at least one bug number, or --list-ni")
 
     key = api_key()
+    if args.list_ni:
+        try:
+            list_needinfos(key)
+        except BugzillaError as e:
+            sys.exit(str(e))
+        return
     failed = []
     for i, bug_id in enumerate(args.bugs):
         if i:
