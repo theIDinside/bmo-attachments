@@ -49,6 +49,7 @@ bmo 1234567 7654321 1111111      # creates ./1234567/, ./7654321/ and ./1111111/
 bmo 1234567 --include-comments   # also save all bug comments
 bmo 1234567 --include-obsolete   # also fetch obsolete attachments
 bmo 1234567 --include-phabricator  # also fetch Phabricator revision links
+bmo 1234567 --no-extract         # don't unpack zip/tar attachments
 ```
 
 The bug folder will contain:
@@ -56,12 +57,19 @@ The bug folder will contain:
 - `summary.md`: the bug title, its URL, and the bug description (first comment).
 - `comments.md` (with `--include-comments`): all comments visible to your account, including the description, in comment-number order. Each includes its original comment number, author, timestamp, and a direct link.
 - One file per attachment, under its original filename. If two attachments share a name (say, two `testcase.html`), the later one gets its attachment ID as a prefix (`<attachment-id>-<filename>`) so it does not overwrite the first.
+- The contents of any zip or tar attachment (see [Archives](#archives)).
 
 Comments are saved to `comments.md` only with `--include-comments`, including for dependencies of meta bugs. The description is always included in `summary.md`.
 
 Obsolete attachments are skipped unless you pass `--include-obsolete`.
 
 Phabricator patches are skipped unless you pass `--include-phabricator`. With it, each one is saved as a small `phabricator-D<nnn>-url.txt` file that just contains the revision URL.
+
+### Archives
+
+Attachments ending in `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tar.xz` or `.txz` are unpacked straight into the bug folder, next to the archive itself, instead of into a separate folder. Any folders inside the archive are kept. The archive is kept as well. Pass `--no-extract` to turn this off.
+
+Extracted files never overwrite `summary.md`, `comments.md` or another attachment: if a top-level name is already taken, it gets the archive's attachment ID as a prefix, just like duplicate attachment names. Paths that would escape the bug folder (absolute paths or `..`) are rewritten to stay inside it, and symlinks and other special files in tar archives are skipped. If an archive is corrupt, a warning is printed and the archive file is still saved.
 
 ### Meta bugs
 

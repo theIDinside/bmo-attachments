@@ -12,18 +12,22 @@ Create one at https://bugzilla.mozilla.org/userprefs.cgi?tab=apikey
 
 import argparse
 import base64
+import io
 import json
 import os
 import re
 import sys
+import tarfile
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 
 BMO = "https://bugzilla.mozilla.org/rest"
 KEY_FILE = Path.home() / ".config" / "bmo-api-key"
 PHABRICATOR_CONTENT_TYPE = "text/x-phabricator-request"
+TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
 
 
 class BugzillaError(Exception):
@@ -59,6 +63,51 @@ def get(path, key):
 def safe_name(name):
     name = re.sub(r"[/\\\x00]", "_", name).strip(". ")
     return name or "attachment"
+
+
+def archive_members(name, content):
+    """Yield (path, data) for each regular file in a zip or tar archive, else nothing."""
+    lower = name.lower()
+    if lower.endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            for info in zf.infolist():
+                if not info.is_dir():
+                    yield info.filename, zf.read(info)
+    elif lower.endswith(TAR_SUFFIXES):
+        with tarfile.open(fileobj=io.BytesIO(content)) as tf:
+            for member in tf:
+                # Skips directories, links and devices; directories are recreated as needed.
+                if member.isfile():
+                    yield member.name, tf.extractfile(member).read()
+
+
+def extract(att_id, name, content, dest, used):
+    """Extract a zip or tar attachment straight into dest, without overwriting anything in used."""
+    added = set()
+    count = 0
+    try:
+        for member, data in archive_members(name, content):
+            # Drop absolute and ".." components so nothing lands outside dest.
+            parts = [p for p in re.split(r"[/\\]", member) if p not in ("", ".", "..")]
+            if not parts:
+                continue
+            parts = [p.replace("\x00", "_") for p in parts]
+            if parts[0] in used:
+                parts[0] = f"{att_id}-{parts[0]}"
+            path = dest.joinpath(*parts)
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            except OSError as e:
+                print(f"  could not extract {member}: {e}", file=sys.stderr)
+                continue
+            added.add(parts[0])
+            count += 1
+    except (zipfile.BadZipFile, tarfile.TarError, EOFError, OSError) as e:
+        print(f"  could not extract {name}: {e}", file=sys.stderr)
+    used |= added
+    if count:
+        print(f"  extracted {count} file{'s' if count != 1 else ''} into {dest}")
 
 
 def download(bug_id, parent, args, key, seen):
@@ -120,6 +169,8 @@ def download(bug_id, parent, args, key, seen):
         path.write_bytes(content)
         flags = " (obsolete)" if att["is_obsolete"] else ""
         print(f"{path}  [{len(content)} bytes]{flags}  {att['summary']}")
+        if not args.no_extract:
+            extract(att_id, name, content, dest, used)
 
     if "meta" not in bug["keywords"]:
         return
@@ -184,6 +235,11 @@ def main():
         "--include-phabricator",
         action="store_true",
         help="also download Phabricator revision links",
+    )
+    parser.add_argument(
+        "--no-extract",
+        action="store_true",
+        help="don't unpack zip and tar attachments into the bug directory",
     )
     parser.add_argument(
         "--list-ni",
