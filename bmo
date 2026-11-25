@@ -83,28 +83,41 @@ def archive_members(name, content):
 
 def extract(att_id, name, content, dest, used):
     """Extract a zip or tar attachment straight into dest, without overwriting anything in used."""
-    added = set()
-    count = 0
+    members = []
     try:
         for member, data in archive_members(name, content):
             # Drop absolute and ".." components so nothing lands outside dest.
             parts = [p for p in re.split(r"[/\\]", member) if p not in ("", ".", "..")]
-            if not parts:
-                continue
-            parts = [p.replace("\x00", "_") for p in parts]
-            if parts[0] in used:
-                parts[0] = f"{att_id}-{parts[0]}"
-            path = dest.joinpath(*parts)
-            try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(data)
-            except OSError as e:
-                print(f"  could not extract {member}: {e}", file=sys.stderr)
-                continue
-            added.add(parts[0])
-            count += 1
+            if parts:
+                members.append((member, [p.replace("\x00", "_") for p in parts], data))
     except (zipfile.BadZipFile, tarfile.TarError, EOFError, OSError) as e:
         print(f"  could not extract {name}: {e}", file=sys.stderr)
+        return
+    # Hidden files such as .git/config or .envrc can make tools run commands
+    # just by entering the directory, so refuse the whole archive.
+    hidden = [member for member, parts, _ in members if any(p.startswith(".") for p in parts)]
+    if hidden:
+        print(
+            f"  warning: not extracting {name}, it contains hidden files: "
+            + ", ".join(hidden[:5])
+            + (f" and {len(hidden) - 5} more" if len(hidden) > 5 else ""),
+            file=sys.stderr,
+        )
+        return
+    added = set()
+    count = 0
+    for member, parts, data in members:
+        if parts[0] in used:
+            parts[0] = f"{att_id}-{parts[0]}"
+        path = dest.joinpath(*parts)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        except OSError as e:
+            print(f"  could not extract {member}: {e}", file=sys.stderr)
+            continue
+        added.add(parts[0])
+        count += 1
     used |= added
     if count:
         print(f"  extracted {count} file{'s' if count != 1 else ''} into {dest}")
@@ -169,7 +182,7 @@ def download(bug_id, parent, args, key, seen):
         path.write_bytes(content)
         flags = " (obsolete)" if att["is_obsolete"] else ""
         print(f"{path}  [{len(content)} bytes]{flags}  {att['summary']}")
-        if not args.no_extract:
+        if args.extract:
             extract(att_id, name, content, dest, used)
 
     if "meta" not in bug["keywords"]:
@@ -237,9 +250,9 @@ def main():
         help="also download Phabricator revision links",
     )
     parser.add_argument(
-        "--no-extract",
+        "--extract",
         action="store_true",
-        help="don't unpack zip and tar attachments into the bug directory",
+        help="unpack zip and tar attachments into the bug directory",
     )
     parser.add_argument(
         "--list-ni",
